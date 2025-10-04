@@ -6,6 +6,7 @@ import openai
 from openai import OpenAI
 import json
 import pandas_market_calendars as mcal
+import os
 
 weather_api_key = os.environ["WEATHER_API_KEY"]
 city = "San Francisco"
