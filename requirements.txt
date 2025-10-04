@@ -1,0 +1,6 @@
+requests
+pytz
+openai
+pandas_market_calendars
+twilio
+holidays
