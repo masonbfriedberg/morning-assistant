@@ -240,6 +240,8 @@ Then include:
 - Write 2–3 sentences per story with relevant context.
 - Keep it human — no robotic transitions like “in other news.”
 
+(Skip 3 and 4 if the stock market is not open on {formatted_date} (Saturday, Sunday, or Stock Market Observed Holiday)
+
 3. Ticker-specific market news:
 - Summarize each relevant stock or ticker mentioned in the news.
 - Format as: “NRG is trading at $89.23, up 1.2% today,” or similar.
