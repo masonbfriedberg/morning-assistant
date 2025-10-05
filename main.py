@@ -237,7 +237,7 @@ Then include:
 
 2. World news:
 - Smoothly summarize each story into a single paragraph (no bullet points, no headlines).
-- Write 2–3 sentences per story with relevant context.
+- Include a 2–3 sentences summary per story with relevant context.
 - Keep it human — no robotic transitions like “in other news.”
 
 (Skip 3 and 4 if the stock market is not open on {formatted_date} (Saturday, Sunday, or Stock Market Observed Holiday))
@@ -245,6 +245,7 @@ Then include:
 
 3. Ticker-specific market news:
 - Summarize each relevant stock or ticker mentioned in the news.
+- Include a 2-3 sentence summary of each news event.
 - Format as: “NRG is trading at $89.23, up 1.2% today,” or similar.
 - Include a few words of context or reasoning when available.
 
