@@ -7,6 +7,7 @@ from openai import OpenAI
 import json
 import pandas_market_calendars as mcal
 import os
+from twilio.rest import Client
 
 weather_api_key = os.environ["WEATHER_API_KEY"]
 city = "San Francisco"
@@ -102,35 +103,17 @@ market_news_response = requests.get(market_news_url)
 market_news_data = market_news_response.json()
 top_market_articles = market_news_data["articles"][:3]
 
-market_message = ""
-
 market_news_output = []
 
 for article in top_market_articles:
-    if article["title"] and article["description"]:
+    if article.get("title") and article.get("description"):
         market_news_output.append({
             "title": article["title"],
             "description": article["description"].strip()
         })
 
 # Initialize OpenAI client
-client = OpenAI(api_key= os.environ["OPENAI_API_KEY"])
-
-# Prepare your market news input list
-market_news_output = [
-    {
-        "title": "Here's How Much You Would Have Made Owning NRG Energy Stock In The Last 5 Years",
-        "description": "NRG Energy (NYSE:NRG) has outperformed the market over the past 5 years by 25.16% on an annualized basis producing an average annual return of 40.01%. Currently, NRG Energy has a market capitalization of $32.36 billion. \nBuying $1000 In NRG: If ...\nFull story…"
-    },
-    {
-        "title": "Datavault AI Converts $13.3 Million in Convertible Debt, Strengthens Balance Sheet",
-        "description": "BEAVERTON, Ore., Oct. 02, 2025 (GLOBE NEWSWIRE) -- via IBN – Datavault AI Inc. (Nasdaq: DVLT), a pioneer in AI-driven data monetization, today announced the full conversion of certain long term notes with an aggregate original face value of $13.3 million ther…"
-    },
-    {
-        "title": "Corn Rallies Back into Thursday’s Close",
-        "description": "Jump-Start Your Search For Promising Trade Ideas With Barchart Premier’s \"Top Stock Pick\".\nFREE 30 Day Trial\n- Market Pulse\n- VolatilityVolume & Open InterestHorizontal StrategiesButterfly Strategies\n-\n- Market PulseResourcesEuropean FuturesEuropean Groupings…"
-    }
-]
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 # Define the system prompt
 system_prompt = """You are a financial news analyst. You will be given a list of news articles, each with a title and description. For each article:
@@ -167,15 +150,6 @@ def fetch_quote(symbol):
     )
     resp = requests.get(url)
     j = resp.json()
-    # The JSON typically looks like:
-    # {
-    #   "Global Quote": {
-    #     "01. symbol": "MSFT",
-    #     "05. price": "338.50",
-    #     "10. change percent": "0.48%"
-    #     ...
-    #   }
-    # }
     quote = j.get("Global Quote", {})
     price = quote.get("05. price", None)
     change_percent = quote.get("10. change percent", None)
@@ -257,7 +231,7 @@ Start with:
 Then include:
 
 1. Weather summary:
-- Describe the current weather and temperature in San Francisco.
+- Describe the current weather and temperature. 
 - Suggest what to wear based on temperature and conditions.
 - Include how the weather will change throughout the day and offer useful advice (e.g., "it will get warmer later so you may want to take off your jacket," or "rain is expected this evening so pack an umbrella").
 
@@ -306,9 +280,6 @@ response = client.chat.completions.create(
 # Output
 final_message = response.choices[0].message.content
 
-from twilio.rest import Client
-import os
-
 def send_sms(message_text):
     account_sid = os.environ["ACCOUNT_SID"]
     auth_token = os.environ["AUTH_TOKEN"]
@@ -321,7 +292,7 @@ def send_sms(message_text):
         from_=from_number,
         to=to_number
     )
-    print(f"✅ Sent SMS: {message.sid}")
+    print(f"Sent SMS: {message.sid}")
 
 # Call it after defining
 send_sms("This is a test message!")
