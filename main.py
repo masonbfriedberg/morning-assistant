@@ -241,7 +241,7 @@ Then include:
 - Keep it human — no robotic transitions like “in other news.”
 
 (Skip 3 and 4 if the stock market is not open on {formatted_date} (Saturday, Sunday, or Stock Market Observed Holiday))
-(Do Not include any message, just go from 2 to the End)
+(Do not include any replacement message either. Simply go from World News to the closing line"
 
 3. Ticker-specific market news:
 - Summarize each relevant stock or ticker mentioned in the news.
