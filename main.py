@@ -280,6 +280,8 @@ response = client.chat.completions.create(
 # Output
 final_message = response.choices[0].message.content
 
+print(final_message)
+
 def send_sms(message_text):
     account_sid = os.environ["ACCOUNT_SID"]
     auth_token = os.environ["AUTH_TOKEN"]
