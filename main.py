@@ -313,7 +313,6 @@ print(final_message)
 def send_sms(message_text):
     token = os.environ["YOUR_BOT_TOKEN"]
     chat_id = os.environ["YOUR_CHAT_ID"]
-    text = "Test message from Butler."
-    requests.get(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}")
+    requests.get(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message_text}")
 
 send_sms(final_message)
