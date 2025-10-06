@@ -311,18 +311,10 @@ final_message = response.choices[0].message.content
 print(final_message)
 
 def send_sms(message_text):
-    account_sid = os.environ["ACCOUNT_SID"]
-    auth_token = os.environ["AUTH_TOKEN"]
-    from_number = os.environ["FROM_NUMBER"]
-    to_number = os.environ["TO_NUMBER"]
-
-    client = Client(account_sid, auth_token)
-    message = client.messages.create(
-        body=message_text,
-        from_=from_number,
-        to=to_number
-    )
-    print(f"Sent SMS: {message.sid}")
+    token = os.environ["YOUR_BOT_TOKEN"]
+    chat_id = os.environ["YOUR_CHAT_ID"]
+    text = "Test message from Butler."
+    requests.get(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}")
 
 # Call it after defining
 send_sms("This is a test message!")
