@@ -9,10 +9,12 @@ import pandas_market_calendars as mcal
 import os
 from twilio.rest import Client
 
-# Initialize OpenAI client
+# Keys
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-
 weather_api_key = os.environ["WEATHER_API_KEY"]
+news_api_key = os.environ["NEWS_API_KEY"]
+ALPHA_KEY = os.environ["APLHA_API_KEY"]
+
 city = "San Francisco"
 weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={weather_api_key}&units=imperial"
 weather_response = requests.get(weather_url)
@@ -66,18 +68,23 @@ def get_outfit(temp, condition):
 
 # Generate weather message
 outfit = get_outfit(current_temp, condition)
-weather_message = (
-    f"It's currently {current_temp}°F in {city} and feels like {feels_like}°F. "
-    f"The skies are {description.lower()}. I recommend wearing: {outfit}."
+weather_input = (
+    f"Temp: {current_temp}°F, City: {city}, feels like {feels_like}°F, skies: {description.lower()}, outfit recommendation {outfit}."
 )
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[
+        {"role": "system", "content": "You are a Butler of Mason uses the input to provide an expert weather update. Don't forget to mention how the weather may change throughout the day and how that may affect the outfit."},
+        {"role": "user", "content": f"Here is the story: {weather_input}"}
+    ],
+    temperature=0.7)
+weather_message = response.choices[0].message.content.strip()
 
 # Get 10PM yesterday in UTC
 pst = pytz.timezone("America/Los_Angeles")
 now = datetime.now(pst)
 yesterday_10pm = (now - timedelta(days=1)).replace(hour=22, minute=0, second=0, microsecond=0)
 utc_time = yesterday_10pm.astimezone(pytz.utc).isoformat()
-
-news_api_key = os.environ["NEWS_API_KEY"]
 
 news_message = ""
 topics = ["politics", "technology", "economy"]
@@ -91,101 +98,128 @@ for topic in topics:
     news_data = news_response.json()
     top_articles = news_data["articles"][:3]
 
-    news_message += f"\n🧠 {topic.title()} Headlines:\n"
+    news_message += f"\n{topic.title()} Headlines:\n"
     for article in top_articles:
         if article["title"] and article["description"]:
             title_lower = article["title"].lower()
             desc_lower = article["description"].lower()
             if all(k not in title_lower and k not in desc_lower for k in skip_keywords):
-                news_message += f"📰 {article['title']}\n"
-                news_message += f"📝 {article['description'].strip()}\n\n"
+                response = client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": "You are an expert news reporter who researches and summarizes news in a central viewpoint."},
+                        {"role": "user", "content": f"Here is the story: {article}"}
+                    ],
+                    temperature=0.7)
+                summary = response.choices[0].message.content.strip()
+                news_message += f"{article['title']}\n{summary}\n\n"
 
-market_message = ""
 market_news_url = f"https://newsapi.org/v2/everything?q=stock%20market&from={utc_time}&sortBy=publishedAt&language=en&apiKey={news_api_key}"
 market_news_response = requests.get(market_news_url)
 market_news_data = market_news_response.json()
 top_market_articles = market_news_data["articles"][:3]
 
-market_news_output = []
-
-for article in top_market_articles:
-    if article.get("title") and article.get("description"):
-        market_news_output.append({
-            "title": article["title"],
-            "description": article["description"].strip()
-        })
-
-# Define the system prompt
-system_prompt = """You are a financial news analyst. You will be given a list of news articles, each with a title and description. For each article:
-
-1. Remove any ads, source links, or irrelevant content.
-2. Summarize the core story in 2–3 professional, informative sentences.
-3. Research the most relevant public stock ticker(s) (max 2) directly related to the article.
-4. Return a clean JSON array where each object has:
-   - "original_title"
-   - "summary"
-   - "ticker" (e.g., ["AAPL", "GOOGL"])
-"""
-
-# Call OpenAI Chat API using new SDK format
-response = client.chat.completions.create(
-    model="gpt-4",
-    messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Here is the input list:\n\n{market_news_output}"}
-    ],
-    temperature=0.4
-)
-
-# Extract and print structured output
-structured_output = response.choices[0].message.content
-
-ALPHA_KEY = os.environ["APLHA_API_KEY"]
+market_news_message = ""
 
 def fetch_quote(symbol):
-    """Fetch global quote data for one symbol via Alpha Vantage."""
-    url = (
-        f"https://www.alphavantage.co/query?"
-        f"function=GLOBAL_QUOTE&symbol={symbol}&apikey={ALPHA_KEY}"
-    )
-    resp = requests.get(url)
-    j = resp.json()
-    quote = j.get("Global Quote", {})
-    price = quote.get("05. price", None)
-    change_percent = quote.get("10. change percent", None)
-    return {"symbol": symbol, "price": price, "change_percent": change_percent}
+    """Fetch global quote data for one or more symbols via Alpha Vantage."""
+    if isinstance(symbol, list):
+        results = []
+        for s in symbol:
+            url = (
+                f"https://www.alphavantage.co/query?"
+                f"function=GLOBAL_QUOTE&symbol={s}&apikey={ALPHA_KEY}"
+            )
+            resp = requests.get(url)
+            j = resp.json()
+            quote = j.get("Global Quote", {})
+            price = quote.get("05. price", None)
+            change_percent = quote.get("10. change percent", None)
+            results.append({"symbol": s, "price": price, "change_percent": change_percent})
+        return results
+    else:
+        url = (
+            f"https://www.alphavantage.co/query?"
+            f"function=GLOBAL_QUOTE&symbol={symbol}&apikey={ALPHA_KEY}"
+        )
+        resp = requests.get(url)
+        j = resp.json()
+        quote = j.get("Global Quote", {})
+        price = quote.get("05. price", None)
+        change_percent = quote.get("10. change percent", None)
+        return {"symbol": symbol, "price": price, "change_percent": change_percent}
 
-def build_market_message(news_summary_list):
-    """
-    news_summary_list is the output from ChatGPT, e.g.:
-    [
-       {"original_title": "...", "summary": "...", "ticker": ["DVLT"]},
-       ...
-    ]
-    """
-    market_message = ""
-    # News portion
-    market_message += "📰 Market News & Ticker Performance:\n"
-    for item in news_summary_list:
-        title = item["original_title"]
-        summary = item["summary"]
-        tickers = item.get("ticker", [])
-        if tickers:
-            # Use the first ticker as main
-            sym = tickers[0]
-            quote = fetch_quote(sym)
-            price = quote["price"]
-            chg = quote["change_percent"]
-            market_message += f"- {title} — {summary} — {sym}: {price} ({chg})\n"
+for article in top_market_articles:
+    if article.get("title") or article.get("description"):
+        # --- Get related ticker(s)
+        ticker_response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Research the input to find the related ticker or tickers being mentioned "
+                        "and return them as a comma-separated list in this format: (e.g ['AAPL','NVDA'])"
+                    ),
+                },
+                {"role": "user", "content": f"Here is the story: {article}"},
+            ],
+            temperature=0.7,
+        )
+        tickers_text = ticker_response.choices[0].message.content.strip()
+        try:
+            tickers = eval(tickers_text)
+            if not isinstance(tickers, list):
+                tickers = [tickers_text]
+        except Exception:
+            tickers = [tickers_text]
+        summary_response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert financial news reporter who researches and summarizes news in a central viewpoint. You may use the internet to find more information on thee stories.",
+                },
+                {"role": "user", "content": f"Here is the story: {article}"},
+            ],
+            temperature=0.7,
+        )
+        summary = summary_response.choices[0].message.content.strip()
+        if tickers and all(t.strip() for t in tickers):
+            quotes = fetch_quote(tickers)
+            if isinstance(quotes, dict):
+                quotes = [quotes]  # unify single and multi
+            for q in quotes:
+                sym = q["symbol"]
+                price = q["price"] or "N/A"
+                change = q["change_percent"] or "N/A"
+                market_news_message += (
+                    f"{sym}: {article['title']}\n{summary}\n"
+                    f"Price: {price} | Change: {change}\n\n"
+                )
         else:
-            market_message += f"- {title} — {summary}\n"
-    market_message += "\n📈 Major Indices:\n"
-    # Choose index tickers to fetch, e.g. SPY, DIA, QQQ or use symbols your API supports
-    for idx in ["SPY", "DIA", "QQQ"]:
-        q = fetch_quote(idx)
-        if q["price"] and q["change_percent"]:
-            market_message += f"{idx}: {q['price']} ({q['change_percent']})\n"
-    return market_message
+            market_news_message += f"{article['title']}\n{summary}\n\n"
+
+market_message = ""
+
+# Major Indices
+market_message += "Major Indices:\n"
+for idx in ["SPY", "DIA", "QQQ"]:
+    q = fetch_quote(idx)
+    if q.get("price") and q.get("change_percent"):
+        market_message += f"{idx}: {q['price']} ({q['change_percent']})\n"
+
+# Bitcoin
+btc = fetch_quote("BTCUSD")
+if btc.get("price") and btc.get("change_percent"):
+    market_message += f"\nBitcoin: {btc['price']} ({btc['change_percent']})\n"
+
+# U.S. Dollar Index (try fallback symbol)
+for sym in ["DX-Y.NYB", "DXY", "USDOLLAR"]:
+    dxy = fetch_quote(sym)
+    if dxy.get("price") and dxy.get("change_percent"):
+        market_message += f"\nU.S. Dollar Index: {dxy['price']} ({dxy['change_percent']})\n"
+        break
 
 pst = pytz.timezone("America/Los_Angeles")
 now = datetime.now(pst)
@@ -223,52 +257,42 @@ else:
     closing_line = "Hope you have a great day!"
 
 full_prompt = f"""
-You are an AI assistant. Craft a personalized morning message for Mason using the details below. Write it in a friendly, intelligent tone.
 
-Start with:
-"Good Morning Mason, it's {formatted_time} Pacific Time on {formatted_date}."
+You are Mason's butler providing his morning update. Speak directly to Mason in a natural, conversational tone — intelligent, warm, and personal — as if you’re briefing him in person.
+Your role is to assemble the provided content into a smooth morning briefing without summarizing, reinterpreting, or omitting meaningful details. 
+Preserve all descriptive information from the stories exactly as given, only removing filler sentences or repetition. 
+Make transitions between sections sound fluid and natural, like a real person would when talking.
+
+Begin with:
+"Good morning Mason, it's {formatted_time} Pacific Time on {formatted_date}."
 
 Then include:
 
 1. Weather summary:
-- Describe the current weather and temperature. 
-- Suggest what to wear based on temperature and conditions.
-- Include how the weather will change throughout the day and offer useful advice (e.g., "it will get warmer later so you may want to take off your jacket," or "rain is expected this evening so pack an umbrella").
+{weather_message}
 
 2. World news:
-- Smoothly summarize each story into a single paragraph (no bullet points, no headlines).
-- Include a 2–3 sentences summary per story with relevant context.
-- Keep it human — no robotic transitions like “in other news.”
+{news_message}
 
-(Skip 3 and 4 if the stock market is not open on {formatted_date} (Saturday, Sunday, or Stock Market Observed Holiday))
-(Do not include any replacement message either. Simply go from World News to the closing line"
+If the stock market is closed on {formatted_date} (Saturday, Sunday, or a U.S. Stock Market Observed Holiday),
+**skip sections 3 and 4 completely** and go straight to the closing line — do not include any message about skipping or waiting for markets to open.
 
-3. Ticker-specific market news:
-- Summarize each relevant stock or ticker mentioned in the news.
-- Include a 2-3 sentence summary of each news event.
-- Format as: “NRG is trading at $89.23, up 1.2% today,” or similar.
-- Include a few words of context or reasoning when available.
+3. Market-related headlines (if market is open):
+{market_news_message}
 
-4. Market summary:
-- Share updates on major indices like the S&P 500, Dow Jones, and NASDAQ.
-- Briefly include gold, oil, and Bitcoin.
+4. Market summary (if market is open):
+{market_message}
 
 End with:
 {closing_line}
 
-Inputs:
-
-Weather:
-{weather_message}
-
-News:
-{news_message}
-
-Market News (with tickers):
-{market_news_output}
-
-Markets:
-{market_message}
+Additional style rules:
+- Speak in full sentences with natural phrasing.
+- Avoid robotic or report-like tone.
+- Never introduce or invent new information.
+- Never include the literal section numbers or headings (e.g., don’t say “1. Weather summary”).
+- If the market is closed, there should be **no mention of stocks, tickers, or financial news** at all.
+- The message should read as a single smooth narrative, not a segmented report.
 """
 
 # Call OpenAI (new SDK)
