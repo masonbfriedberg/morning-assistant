@@ -316,5 +316,4 @@ def send_sms(message_text):
     text = "Test message from Butler."
     requests.get(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}")
 
-# Call it after defining
-send_sms("This is a test message!")
+send_sms(final_message)
