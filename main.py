@@ -97,6 +97,9 @@ for topic in topics:
                 news_message += f"📰 {article['title']}\n"
                 news_message += f"📝 {article['description'].strip()}\n\n"
 
+print(weather_message)
+print(news_message)
+
 market_message = ""
 market_news_url = f"https://newsapi.org/v2/everything?q=stock%20market&from={utc_time}&sortBy=publishedAt&language=en&apiKey={news_api_key}"
 market_news_response = requests.get(market_news_url)
