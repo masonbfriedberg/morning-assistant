@@ -276,7 +276,7 @@ Then include:
 2. World news:
 {news_message}
 
-If the stock market is closed on {formatted_date} (Saturday, Sunday, or a U.S. Stock Market Observed Holiday),
+If and only if the stock market is closed on {formatted_date} (Saturday, Sunday, or a U.S. Stock Market Observed Holiday),
 **skip sections 3 and 4 completely** and go straight to the closing line — do not include any message about skipping or waiting for markets to open.
 
 3. Market-related headlines (if market is open):
