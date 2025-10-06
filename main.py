@@ -9,6 +9,9 @@ import pandas_market_calendars as mcal
 import os
 from twilio.rest import Client
 
+# Initialize OpenAI client
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
 weather_api_key = os.environ["WEATHER_API_KEY"]
 city = "San Francisco"
 weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={weather_api_key}&units=imperial"
@@ -97,9 +100,6 @@ for topic in topics:
                 news_message += f"📰 {article['title']}\n"
                 news_message += f"📝 {article['description'].strip()}\n\n"
 
-print(weather_message)
-print(news_message)
-
 market_message = ""
 market_news_url = f"https://newsapi.org/v2/everything?q=stock%20market&from={utc_time}&sortBy=publishedAt&language=en&apiKey={news_api_key}"
 market_news_response = requests.get(market_news_url)
@@ -114,9 +114,6 @@ for article in top_market_articles:
             "title": article["title"],
             "description": article["description"].strip()
         })
-
-# Initialize OpenAI client
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 # Define the system prompt
 system_prompt = """You are a financial news analyst. You will be given a list of news articles, each with a title and description. For each article:
