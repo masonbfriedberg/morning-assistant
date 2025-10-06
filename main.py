@@ -14,6 +14,8 @@ client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 weather_api_key = os.environ["WEATHER_API_KEY"]
 news_api_key = os.environ["NEWS_API_KEY"]
 ALPHA_KEY = os.environ["APLHA_API_KEY"]
+token = os.environ["YOUR_BOT_TOKEN"]
+chat_id = os.environ["YOUR_CHAT_ID"]
 
 city = "San Francisco"
 weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={weather_api_key}&units=imperial"
@@ -311,8 +313,26 @@ final_message = response.choices[0].message.content
 print(final_message)
 
 def send_sms(message_text):
-    token = os.environ["YOUR_BOT_TOKEN"]
-    chat_id = os.environ["YOUR_CHAT_ID"]
     requests.get(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message_text}")
 
-send_sms(final_message)
+def send_voice(file_path):
+    with open(file_path, "rb") as f:
+        requests.post(
+            f"https://api.telegram.org/bot{token}/sendVoice",
+            data={"chat_id": chat_id},
+            files={"voice": f}
+        )
+
+def convert_to_audio(message_text):
+    output_path = "butler_message.mp3"                 
+    with client.audio.speech.with_streaming_response.create(
+        model="gpt-4o-mini-tts",
+        voice="alloy",
+        input=message_text
+    ) as response:
+        response.stream_to_file(output_path)           
+    return output_path  
+
+final_message_audio = convert_to_audio(final_message)
+
+send_voice(final_message_audio)
