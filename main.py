@@ -9,6 +9,16 @@ import pandas_market_calendars as mcal
 import os
 from twilio.rest import Client
 
+# Get time
+pst = pytz.timezone("America/Los_Angeles")
+now = datetime.now(pst)
+day_name = now.strftime("%A")
+formatted_date = now.strftime("%B %d, %Y")
+formatted_time = now.strftime("%-I:%M %p")
+
+# Get today’s date
+today = now.date()
+
 # Keys
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 weather_api_key = os.environ["WEATHER_API_KEY"]
@@ -228,15 +238,6 @@ for sym in ["DX-Y.NYB", "DXY", "USDOLLAR"]:
     if dxy.get("price") and dxy.get("change_percent"):
         market_message += f"\nU.S. Dollar Index: {dxy['price']} ({dxy['change_percent']})\n"
         break
-
-pst = pytz.timezone("America/Los_Angeles")
-now = datetime.now(pst)
-day_name = now.strftime("%A")
-formatted_date = now.strftime("%B %d, %Y")
-formatted_time = now.strftime("%-I:%M %p")
-
-# Get today’s date
-today = now.date()
 
 prompt_1 = f"""
 
