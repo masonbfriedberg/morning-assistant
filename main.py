@@ -166,7 +166,7 @@ def fetch_quote(symbol):
         change_percent = quote.get("10. change percent", None)
         return {"symbol": symbol, "price": price, "change_percent": change_percent}
 
-if market_closed == True:
+if market_closed == False:
     for article in top_market_articles:
         if article.get("title") or article.get("description"):
             # --- Get related ticker(s)
@@ -265,25 +265,6 @@ Additional style rules:
 - The message should read as a single smooth narrative, not a segmented report.
 """
 
-prompt_2 = f"""
-
-3. Market-related headlines (if market is open):
-{market_news_message}
-
-4. Market summary (if market is open):
-{market_message}
-
-End with:
-{closing_line}
-
-Additional style rules:
-- Speak in full sentences with natural phrasing.
-- Avoid robotic or report-like tone.
-- Never introduce or invent new information.
-- Never include the literal section numbers or headings (e.g., don’t say “1. Weather summary”).
-- The message should read as a single smooth narrative, not a segmented report.
-"""
-
 # Build closing line based on market status
 if market_closed:
     day_name = now.strftime("%A")
@@ -305,6 +286,24 @@ else:
     closing_line = "Hope you have a great day!"
     full_prompt = prompt_1 + "\n\n" + prompt_2
 
+prompt_2 = f"""
+
+3. Market-related headlines (if market is open):
+{market_news_message}
+
+4. Market summary (if market is open):
+{market_message}
+
+End with:
+{closing_line}
+
+Additional style rules:
+- Speak in full sentences with natural phrasing.
+- Avoid robotic or report-like tone.
+- Never introduce or invent new information.
+- Never include the literal section numbers or headings (e.g., don’t say “1. Weather summary”).
+- The message should read as a single smooth narrative, not a segmented report.
+"""
 
 # Call OpenAI (new SDK)
 response = client.chat.completions.create(
