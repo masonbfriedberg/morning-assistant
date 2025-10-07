@@ -116,6 +116,10 @@ for topic in topics:
                 summary = response.choices[0].message.content.strip()
                 news_message += f"{article['title']}\n{summary}\n\n"
 
+# Check if market is open today
+schedule = nyse.schedule(start_date=today, end_date=today)
+market_closed = schedule.empty  # True if no trading today
+
 market_news_url = f"https://newsapi.org/v2/everything?q=stock%20market&from={utc_time}&sortBy=publishedAt&language=en&apiKey={news_api_key}"
 market_news_response = requests.get(market_news_url)
 market_news_data = market_news_response.json()
@@ -151,56 +155,57 @@ def fetch_quote(symbol):
         change_percent = quote.get("10. change percent", None)
         return {"symbol": symbol, "price": price, "change_percent": change_percent}
 
-for article in top_market_articles:
-    if article.get("title") or article.get("description"):
-        # --- Get related ticker(s)
-        ticker_response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Research the input to find the related ticker or tickers being mentioned "
-                        "and return them as a comma-separated list in this format: (e.g ['AAPL','NVDA'])"
-                    ),
-                },
-                {"role": "user", "content": f"Here is the story: {article}"},
-            ],
-            temperature=0.7,
-        )
-        tickers_text = ticker_response.choices[0].message.content.strip()
-        try:
-            tickers = eval(tickers_text)
-            if not isinstance(tickers, list):
+if market_closed == True:
+    for article in top_market_articles:
+        if article.get("title") or article.get("description"):
+            # --- Get related ticker(s)
+            ticker_response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Research the input to find the related ticker or tickers being mentioned "
+                            "and return them as a comma-separated list in this format: (e.g ['AAPL','NVDA'])"
+                        ),
+                    },
+                    {"role": "user", "content": f"Here is the story: {article}"},
+                ],
+                temperature=0.7,
+            )
+            tickers_text = ticker_response.choices[0].message.content.strip()
+            try:
+                tickers = eval(tickers_text)
+                if not isinstance(tickers, list):
+                    tickers = [tickers_text]
+            except Exception:
                 tickers = [tickers_text]
-        except Exception:
-            tickers = [tickers_text]
-        summary_response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert financial news reporter who researches and summarizes news in a central viewpoint. You may use the internet to find more information on thee stories.",
-                },
-                {"role": "user", "content": f"Here is the story: {article}"},
-            ],
-            temperature=0.7,
-        )
-        summary = summary_response.choices[0].message.content.strip()
-        if tickers and all(t.strip() for t in tickers):
-            quotes = fetch_quote(tickers)
-            if isinstance(quotes, dict):
-                quotes = [quotes]  # unify single and multi
-            for q in quotes:
-                sym = q["symbol"]
-                price = q["price"] or "N/A"
-                change = q["change_percent"] or "N/A"
-                market_news_message += (
-                    f"{sym}: {article['title']}\n{summary}\n"
-                    f"Price: {price} | Change: {change}\n\n"
-                )
-        else:
-            market_news_message += f"{article['title']}\n{summary}\n\n"
+            summary_response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert financial news reporter who researches and summarizes news in a central viewpoint. You may use the internet to find more information on thee stories.",
+                    },
+                    {"role": "user", "content": f"Here is the story: {article}"},
+                ],
+                temperature=0.7,
+            )
+            summary = summary_response.choices[0].message.content.strip()
+            if tickers and all(t.strip() for t in tickers):
+                quotes = fetch_quote(tickers)
+                if isinstance(quotes, dict):
+                    quotes = [quotes]  # unify single and multi
+                for q in quotes:
+                    sym = q["symbol"]
+                    price = q["price"] or "N/A"
+                    change = q["change_percent"] or "N/A"
+                    market_news_message += (
+                        f"{sym}: {article['title']}\n{summary}\n"
+                        f"Price: {price} | Change: {change}\n\n"
+                    )
+            else:
+                market_news_message += f"{article['title']}\n{summary}\n\n"
 
 market_message = ""
 
@@ -235,30 +240,7 @@ nyse = mcal.get_calendar('NYSE')
 # Get today’s date
 today = now.date()
 
-# Check if market is open today
-schedule = nyse.schedule(start_date=today, end_date=today)
-market_closed = schedule.empty  # True if no trading today
-
-# Build closing line based on market status
-if market_closed:
-    day_name = now.strftime("%A")
-    holiday_name = None
-
-    # Attempt to get holiday name if it's a known market holiday
-    market_holidays = nyse.holidays().holidays
-    if today in market_holidays:
-        holiday_name = today.strftime("%B %d")  # Fallback if name is unknown
-        closing_line = f"Happy {day_name} — it’s a market holiday, so don’t worry about the markets today.\n\nHope you have a great day!"
-    elif today.weekday() == 5:
-        closing_line = "Happy Saturday — so don’t worry about the markets today.\n\nHope you have a great day!"
-    elif today.weekday() == 6:
-        closing_line = "Happy Sunday — so don’t worry about the markets today.\n\nHope you have a great day!"
-    else:
-        closing_line = f"Markets are closed today ({day_name}) — so don’t worry about the markets.\n\nHope you have a great day!"
-else:
-    closing_line = "Hope you have a great day!"
-
-full_prompt = f"""
+prompt_1 = f"""
 
 You are Mason's butler providing his morning update. Speak directly to Mason in a natural, conversational tone — intelligent, warm, and personal — as if you’re briefing him in person.
 Your role is to assemble the provided content into a smooth morning briefing without summarizing, reinterpreting, or omitting meaningful details. 
@@ -276,8 +258,15 @@ Then include:
 2. World news:
 {news_message}
 
-If and only if the stock market is closed on {formatted_date} (Saturday, Sunday, or a U.S. Stock Market Observed Holiday),
-**skip sections 3 and 4 completely** and go straight to the closing line — do not include any message about skipping or waiting for markets to open.
+Additional style rules:
+- Speak in full sentences with natural phrasing.
+- Avoid robotic or report-like tone.
+- Never introduce or invent new information.
+- Never include the literal section numbers or headings (e.g., don’t say “1. Weather summary”).
+- The message should read as a single smooth narrative, not a segmented report.
+"""
+
+prompt_2 = f"""
 
 3. Market-related headlines (if market is open):
 {market_news_message}
@@ -293,9 +282,30 @@ Additional style rules:
 - Avoid robotic or report-like tone.
 - Never introduce or invent new information.
 - Never include the literal section numbers or headings (e.g., don’t say “1. Weather summary”).
-- If the market is closed, there should be **no mention of stocks, tickers, or financial news** at all.
 - The message should read as a single smooth narrative, not a segmented report.
 """
+
+# Build closing line based on market status
+if market_closed:
+    day_name = now.strftime("%A")
+    holiday_name = None
+    full_prompt = prompt_1
+
+    # Attempt to get holiday name if it's a known market holiday
+    market_holidays = nyse.holidays().holidays
+    if today in market_holidays:
+        holiday_name = today.strftime("%B %d")  # Fallback if name is unknown
+        closing_line = f"Happy {day_name} — it’s a market holiday, so don’t worry about the markets today.\n\nHope you have a great day!"
+    elif today.weekday() == 5:
+        closing_line = "Happy Saturday — so don’t worry about the markets today.\n\nHope you have a great day!"
+    elif today.weekday() == 6:
+        closing_line = "Happy Sunday — so don’t worry about the markets today.\n\nHope you have a great day!"
+    else:
+        closing_line = f"Markets are closed today ({day_name}) — so don’t worry about the markets.\n\nHope you have a great day!"
+else:
+    closing_line = "Hope you have a great day!"
+    full_prompt = prompt_1 + "\n\n" + prompt_2
+
 
 # Call OpenAI (new SDK)
 response = client.chat.completions.create(
