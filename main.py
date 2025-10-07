@@ -117,6 +117,7 @@ for topic in topics:
                 news_message += f"{article['title']}\n{summary}\n\n"
 
 # Check if market is open today
+nyse = mcal.get_calendar('NYSE')
 schedule = nyse.schedule(start_date=today, end_date=today)
 market_closed = schedule.empty  # True if no trading today
 
@@ -233,9 +234,6 @@ now = datetime.now(pst)
 day_name = now.strftime("%A")
 formatted_date = now.strftime("%B %d, %Y")
 formatted_time = now.strftime("%-I:%M %p")
-
-# Setup NYSE market calendar
-nyse = mcal.get_calendar('NYSE')
 
 # Get today’s date
 today = now.date()
