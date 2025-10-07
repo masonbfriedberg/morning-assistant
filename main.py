@@ -1,13 +1,10 @@
 import requests
 from datetime import datetime, timedelta
 import pytz
-import re
 import openai
 from openai import OpenAI
-import json
 import pandas_market_calendars as mcal
 import os
-from twilio.rest import Client
 
 # Get time
 pst = pytz.timezone("America/Los_Angeles")
@@ -196,7 +193,7 @@ if market_closed == False:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert financial news reporter who researches and summarizes news in a central viewpoint. You may use the internet to find more information on thee stories.",
+                        "content": "You are an expert financial news reporter who researches and summarizes news in a central viewpoint. You may use the internet to find more information on the stories.",
                     },
                     {"role": "user", "content": f"Here is the story: {article}"},
                 ],
@@ -265,6 +262,22 @@ Additional style rules:
 - The message should read as a single smooth narrative, not a segmented report.
 """
 
+prompt_2 = f"""
+
+3. Market-related headlines (if market is open):
+{market_news_message}
+
+4. Market summary (if market is open):
+{market_message}
+
+Additional style rules:
+- Speak in full sentences with natural phrasing.
+- Avoid robotic or report-like tone.
+- Never introduce or invent new information.
+- Never include the literal section numbers or headings (e.g., don’t say “1. Weather summary”).
+- The message should read as a single smooth narrative, not a segmented report.
+"""
+
 # Build closing line based on market status
 if market_closed:
     day_name = now.strftime("%A")
@@ -286,24 +299,7 @@ else:
     closing_line = "Hope you have a great day!"
     full_prompt = prompt_1 + "\n\n" + prompt_2
 
-prompt_2 = f"""
-
-3. Market-related headlines (if market is open):
-{market_news_message}
-
-4. Market summary (if market is open):
-{market_message}
-
-End with:
-{closing_line}
-
-Additional style rules:
-- Speak in full sentences with natural phrasing.
-- Avoid robotic or report-like tone.
-- Never introduce or invent new information.
-- Never include the literal section numbers or headings (e.g., don’t say “1. Weather summary”).
-- The message should read as a single smooth narrative, not a segmented report.
-"""
+full_prompt += f"\n\n End with: \n {closing_line}"
 
 # Call OpenAI (new SDK)
 response = client.chat.completions.create(
